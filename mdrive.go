@@ -14,39 +14,37 @@ import (
 
 //About Fields
 const (
-	AboutAppInstalled = "appInstalled"
-	AboutExportFormats = "exportFormats"
+	AboutAppInstalled        = "appInstalled"
+	AboutExportFormats       = "exportFormats"
 	AboutFolderColderPalette = "folderColorPalette"
-	AboutImportFormats = "importFormats"
-	AboutKind = "kind"
-	AboutMaxImportSizes = "maxImportSizes"
-	AboutMaxUploadSize = "maxUploadSize"
-	AboutStorageQuota = "storageQuota"
-	AboutTeamDriveThemes = "teamDriveThemes"
-	AboutUser = "user"
+	AboutImportFormats       = "importFormats"
+	AboutKind                = "kind"
+	AboutMaxImportSizes      = "maxImportSizes"
+	AboutMaxUploadSize       = "maxUploadSize"
+	AboutStorageQuota        = "storageQuota"
+	AboutTeamDriveThemes     = "teamDriveThemes"
+	AboutUser                = "user"
 )
 
 const (
-	ErrorBadRequest = 400
+	ErrorBadRequest         = 400
 	ErrorInvalidCredentials = 401
-	ErrorLimitExceeded = 403
-	ErrorFileNotFound = 404
-	ErrorTooManyRequests = 429
-	ErrorBackendError = 500
-	ErrorUnknownError = 501
+	ErrorLimitExceeded      = 403
+	ErrorFileNotFound       = 404
+	ErrorTooManyRequests    = 429
+	ErrorBackendError       = 500
+	ErrorUnknownError       = 501
 )
-
 
 type DriveService struct {
 	service *drive.Service
-	Root *drive.File
+	Root    *drive.File
 }
-
 
 /*
 Full Scope for Drive
 */
-func AllScopes() string  {
+func AllScopes() string {
 	return drive.DriveScope
 }
 
@@ -55,14 +53,14 @@ func ReadOnlyScope() string {
 }
 
 func NewError(code int, message string) *googleapi.Error {
-	return &googleapi.Error{Code:code, Message:message}
+	return &googleapi.Error{Code: code, Message: message}
 }
 func ResolveError(err error) *googleapi.Error {
 	e1, ok := err.(*googleapi.Error)
 	if ok {
 		return e1
 	} else {
-		return &googleapi.Error{Code:ErrorUnknownError, Message:err.Error()}
+		return &googleapi.Error{Code: ErrorUnknownError, Message: err.Error()}
 	}
 }
 
@@ -100,6 +98,27 @@ func (ds *DriveService) Get(id string) (*drive.File, error) {
 	return lcall.Do()
 }
 
+func (ds *DriveService) FileToRoot(child *drive.File) ([]*drive.File, error) {
+	ret := []*drive.File{}
+	err := findRoot(ds, child, &ret)
+	return ret, err
+
+}
+
+func findRoot(ds *DriveService, file *drive.File, path *[]*drive.File) error {
+	*path = append(*path, file)
+	if len(file.Parents) == 0 { //no more parent
+		return nil
+	} else {
+		p, err := ds.Get(file.Parents[0])
+		if err != nil {
+			return err
+		} else {
+			return findRoot(ds, p, path)
+		}
+	}
+}
+
 func (ds *DriveService) GetByName(name string, folder bool, trashed bool, fileFields string) (*drive.File, error) {
 	q := NewQuery().Name().Eq(name)
 	if folder {
@@ -114,10 +133,10 @@ func (ds *DriveService) GetByName(name string, folder bool, trashed bool, fileFi
 func (ds *DriveService) GetByQuery(q *Query, fileFields string) (*drive.File, error) {
 	lcall := ds.service.Files.List()
 	if q.Err() != nil {
-		return nil,  q.Err()
+		return nil, q.Err()
 	}
 	if q.IsEmpty() {
-		return nil, &googleapi.Error{Code: ErrorBadRequest, Message:"no query defined"}
+		return nil, &googleapi.Error{Code: ErrorBadRequest, Message: "no query defined"}
 	}
 	lcall.Q(q.String())
 
@@ -138,20 +157,19 @@ func (ds *DriveService) GetByQuery(q *Query, fileFields string) (*drive.File, er
 }
 
 func (ds *DriveService) Download(id string, path string) (int64, error) {
-	resp,err := ds.service.Files.Get(id).Download()
+	resp, err := ds.service.Files.Get(id).Download()
 	if err != nil {
 		return 0, err
 	}
 	defer resp.Body.Close()
 
-	f,err := os.Create(path)
+	f, err := os.Create(path)
 	if err != nil {
 		return 0, err
 	}
 	defer f.Close()
 	return io.Copy(f, resp.Body)
 }
-
 
 func (ds *DriveService) List(pageSize int64, parentId string, fileFields string) (*drive.FileList, error) {
 	lcall := ds.service.Files.List()
@@ -197,7 +215,7 @@ func (ds *DriveService) SearchAll(q *Query, fileFields string) ([]*drive.File, e
 	nextToken := ""
 
 	for {
-		if(nextToken != "") {
+		if nextToken != "" {
 			lcall.PageToken(nextToken)
 		}
 		r, err := lcall.Do()
@@ -205,7 +223,7 @@ func (ds *DriveService) SearchAll(q *Query, fileFields string) ([]*drive.File, e
 			return nil, err
 		}
 
-		fs = append(fs,  r.Files...)
+		fs = append(fs, r.Files...)
 		nextToken = r.NextPageToken
 		if nextToken == "" {
 			break
